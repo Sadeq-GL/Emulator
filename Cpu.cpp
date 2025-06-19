@@ -26,6 +26,11 @@ struct MEM{
     Byte operator[]( u32 Address ) const// reads 1 byte from memory.
     {
 
+        return data[Address];
+    }
+
+    Byte& operator[]( u32 Address ) // write 1 byte from memory.
+    {
 
         return data[Address];
     }
@@ -35,7 +40,7 @@ struct MEM{
 
 struct CPU{
     Word pc; // program counter is 16 bits.
-    Word sp; // stack pointer points to the next avalible location on the stack.
+    Byte sp; // stack pointer points to the next avalible location on the stack.
 
     Byte a, x, y; //registers x input y input and accumulator.
 
@@ -61,29 +66,60 @@ struct CPU{
 
     Byte FetchByte ( u32& Ticks, MEM& memory )//fetches the next instruction
     {
-        Byte data = memory [pc];
+        Byte data = memory[pc];
         pc++;
         Ticks --;
         return data;
     }
 
+    Byte ReadByte( u32& Ticks, Byte address, MEM& memory )
+    {
+        Byte data = memory[address];
+        Ticks --;
+        return data;
+    }
 
+    // operation codes
+    static constexpr Byte
+        INS_LDA_IM = 0xA9,
+        INS_LDA_ZP = 0xA5;
 
+    void LDAStatus()
+    {
+        z = (a == 0);
+        n = (a & 0b10000000) > 0;
+    }
 
     void Execute( u32 Ticks, MEM& memory)
     {
         while ( Ticks > 0)
         {   
-            Byte Ins = FetchByte( Ticks, memory); // the next instruction
+            Byte Ins = FetchByte( Ticks, memory); // gets the instruction from memory
+            switch (Ins)
+            {
+                case INS_LDA_IM:
+                {
+                    Byte Value = FetchByte( Ticks, memory);
+                    a = Value;
+                    
+                    LDAStatus();
+                }break;
+                
+                case INS_LDA_ZP:
+                {
+                    Byte ZeroPageAdress = FetchByte(Ticks, memory);
+                    a = ReadByte(Ticks, ZeroPageAdress, memory);
+                    LDAStatus();
+                }break;
+                default:
+                {
+                    printf("instruction not allowed");
+                }break;
+            }
         }
     
     }
 };
-
-
-
-
-
 
 
 
@@ -94,7 +130,11 @@ int main(){
     MEM mem;
     CPU cpu;
     cpu.Reset( mem );
-    cpu.Execute( 2, mem );
+    mem[0xFFFC] = CPU::INS_LDA_ZP;
+    mem[0xFFFD] = 0x42;
+    mem[0x0042] = 0x84;
+    cpu.Execute( 3, mem );
+    printf("The instruction is, %02X. The A register is set to: %02X\n ", cpu.INS_LDA_IM ,cpu.a);
     return 0;
 
 
